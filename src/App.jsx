@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus, X, Check, ChevronRight, BookOpen, BarChart3, Settings,
-  Trash2, Clock, Brain, Flame, Download, Upload, AlertTriangle
+  Trash2, Clock, Brain, Flame, Download, Upload, AlertTriangle,
+  Pencil
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -11,7 +12,10 @@ import {
   loadData, saveData, exportJSON, importJSON, clearAllData, SCHEMA_VERSION
 } from "./storage.js";
 
-// ---------- CONSTANTS ----------
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 const EMOTIONS = {
   positive: [
     "Joy", "Gratitude", "Pride", "Excitement", "Calm",
@@ -30,16 +34,25 @@ const EMOTIONS = {
 const CATEGORY_COLORS = {
   positive: "#7a9b76",
   negative: "#b85c5c",
-  neutral: "#b8a86b"
+  neutral:  "#b8a86b"
 };
 
-// ---------- HELPERS ----------
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 const todayStr = () => new Date().toISOString().split("T")[0];
-const isToday = (iso) => iso.split("T")[0] === todayStr();
+const isToday  = (iso) => iso.split("T")[0] === todayStr();
+
 const fmtTime = (iso) =>
-  new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit", minute: "2-digit", hour12: false
+  });
+
 const fmtDate = (iso) =>
-  new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+  new Date(iso).toLocaleDateString([], {
+    weekday: "short", day: "numeric", month: "short"
+  });
 
 const categoryOf = (emotion) => {
   for (const cat of Object.keys(EMOTIONS)) {
@@ -49,23 +62,18 @@ const categoryOf = (emotion) => {
 };
 
 // ============================================================================
-// MAIN
+// MAIN APP
 // ============================================================================
+
 export default function App() {
-  const [data, setData] = useState(null);
-  const [view, setView] = useState("log");
-  const [showAdd, setShowAdd] = useState(false);
+  const [data, setData]           = useState(null);
+  const [view, setView]           = useState("log");
+  const [showAdd, setShowAdd]     = useState(false);
+  const [editEntry, setEditEntry] = useState(null); // entry object being edited
   const [reviewIdx, setReviewIdx] = useState(0);
 
-  // Load on mount
-  useEffect(() => {
-    setData(loadData());
-  }, []);
-
-  // Save on every change
-  useEffect(() => {
-    if (data) saveData(data);
-  }, [data]);
+  useEffect(() => { setData(loadData()); }, []);
+  useEffect(() => { if (data) saveData(data); }, [data]);
 
   if (!data) {
     return (
@@ -75,20 +83,16 @@ export default function App() {
     );
   }
 
-  const entries = data.entries;
+  const entries    = data.entries;
   const setEntries = (next) =>
     setData({ ...data, entries: typeof next === "function" ? next(entries) : next });
 
-  const addEntry = (e) => {
-    setEntries([{ ...e, id: Date.now().toString() }, ...entries]);
-    setShowAdd(false);
-  };
-  const updateEntry = (id, patch) =>
-    setEntries(entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
-  const deleteEntry = (id) =>
-    setEntries(entries.filter((e) => e.id !== id));
+  const addEntry    = (e)         => { setEntries([{ ...e, id: Date.now().toString() }, ...entries]); setShowAdd(false); };
+  const updateEntry = (id, patch) => setEntries(entries.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  const deleteEntry = (id)        => setEntries(entries.filter((e) => e.id !== id));
+  const saveEdit    = (id, patch) => { updateEntry(id, patch); setEditEntry(null); };
 
-  const todayEntries = entries.filter((e) => isToday(e.timestamp));
+  const todayEntries    = entries.filter((e) => isToday(e.timestamp));
   const unreviewedToday = todayEntries.filter((e) => !e.reviewed);
 
   return (
@@ -96,8 +100,8 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300..700;1,300..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
         .font-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
-        .font-body { font-family: 'Instrument Sans', system-ui, sans-serif; }
-        .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+        .font-body    { font-family: 'Instrument Sans', system-ui, sans-serif; }
+        .font-mono    { font-family: 'JetBrains Mono', ui-monospace, monospace; }
       `}</style>
 
       <div className="relative max-w-lg mx-auto pb-24">
@@ -109,11 +113,11 @@ export default function App() {
               today={todayEntries}
               all={entries}
               onDelete={deleteEntry}
+              onEdit={(entry) => setEditEntry(entry)}
               unreviewedCount={unreviewedToday.length}
               onStartReview={() => { setReviewIdx(0); setView("review"); }}
             />
           )}
-
           {view === "review" && (
             <ReviewView
               unreviewed={unreviewedToday}
@@ -121,18 +125,13 @@ export default function App() {
               setIdx={setReviewIdx}
               onSubmit={(id, patch) => {
                 updateEntry(id, patch);
-                if (reviewIdx + 1 >= unreviewedToday.length) {
-                  setView("log"); setReviewIdx(0);
-                } else {
-                  setReviewIdx(reviewIdx + 1);
-                }
+                if (reviewIdx + 1 >= unreviewedToday.length) { setView("log"); setReviewIdx(0); }
+                else setReviewIdx(reviewIdx + 1);
               }}
               onExit={() => setView("log")}
             />
           )}
-
           {view === "patterns" && <PatternsView entries={entries} />}
-
           {view === "settings" && (
             <SettingsView
               data={data}
@@ -142,7 +141,8 @@ export default function App() {
           )}
         </main>
 
-        {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={addEntry} />}
+        {showAdd   && <EntryModal mode="add"  onClose={() => setShowAdd(false)}  onSave={addEntry} />}
+        {editEntry && <EntryModal mode="edit" onClose={() => setEditEntry(null)} onSave={(patch) => saveEdit(editEntry.id, patch)} initial={editEntry} />}
 
         <BottomNav view={view} setView={setView} onAdd={() => setShowAdd(true)} />
       </div>
@@ -150,15 +150,13 @@ export default function App() {
   );
 }
 
-// ---------- HEADER ----------
+// ============================================================================
+// HEADER
+// ============================================================================
+
 function Header({ view, entries }) {
-  const count = entries.filter((e) => isToday(e.timestamp)).length;
-  const titles = {
-    log: "Today",
-    review: "End-of-Day Review",
-    patterns: "Patterns",
-    settings: "Settings"
-  };
+  const count  = entries.filter((e) => isToday(e.timestamp)).length;
+  const titles = { log: "Today", review: "End-of-Day Review", patterns: "Patterns", settings: "Settings" };
   return (
     <header className="px-5 pt-8 pb-2 border-b border-stone-900">
       <div className="flex items-end justify-between">
@@ -166,9 +164,7 @@ function Header({ view, entries }) {
           <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
             {fmtDate(new Date().toISOString())}
           </div>
-          <h1 className="font-display text-3xl italic tracking-tight mt-1">
-            {titles[view]}
-          </h1>
+          <h1 className="font-display text-3xl italic tracking-tight mt-1">{titles[view]}</h1>
         </div>
         <div className="text-right">
           <div className="font-mono text-2xl text-amber-500">{String(count).padStart(2, "0")}</div>
@@ -179,23 +175,22 @@ function Header({ view, entries }) {
   );
 }
 
-// ---------- LOG VIEW ----------
-function LogView({ today, all, onDelete, unreviewedCount, onStartReview }) {
+// ============================================================================
+// LOG VIEW
+// ============================================================================
+
+function LogView({ today, all, onDelete, onEdit, unreviewedCount, onStartReview }) {
   const past = all.filter((e) => !isToday(e.timestamp)).slice(0, 10);
   return (
     <div className="space-y-6">
       {today.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-stone-800 rounded">
           <p className="font-display italic text-stone-400 text-lg">No entries yet</p>
-          <p className="font-mono text-[11px] tracking-wide text-stone-600 mt-2 uppercase">
-            tap + to log an emotion
-          </p>
+          <p className="font-mono text-[11px] tracking-wide text-stone-600 mt-2 uppercase">tap + to log an emotion</p>
         </div>
       ) : (
         <section className="space-y-2">
-          {today.map((e) => (
-            <EntryCard key={e.id} entry={e} onDelete={() => onDelete(e.id)} />
-          ))}
+          {today.map((e) => <EntryCard key={e.id} entry={e} onDelete={() => onDelete(e.id)} onEdit={() => onEdit(e)} />)}
         </section>
       )}
 
@@ -216,13 +211,9 @@ function LogView({ today, all, onDelete, unreviewedCount, onStartReview }) {
 
       {past.length > 0 && (
         <section>
-          <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">
-            Previous
-          </div>
+          <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Previous</div>
           <div className="space-y-2">
-            {past.map((e) => (
-              <EntryCard key={e.id} entry={e} onDelete={() => onDelete(e.id)} compact />
-            ))}
+            {past.map((e) => <EntryCard key={e.id} entry={e} onDelete={() => onDelete(e.id)} onEdit={() => onEdit(e)} compact />)}
           </div>
         </section>
       )}
@@ -230,25 +221,25 @@ function LogView({ today, all, onDelete, unreviewedCount, onStartReview }) {
   );
 }
 
-function EntryCard({ entry, onDelete, compact }) {
+// ============================================================================
+// ENTRY CARD
+// ============================================================================
+
+function EntryCard({ entry, onDelete, onEdit, compact }) {
   const [expanded, setExpanded] = useState(false);
-  const cat = entry.category || categoryOf(entry.emotion);
+  const cat   = entry.category || categoryOf(entry.emotion);
   const color = CATEGORY_COLORS[cat];
+
   return (
-    <div
-      className="border border-stone-800 bg-stone-900/40 rounded p-4"
-      style={{ borderLeftWidth: "3px", borderLeftColor: color }}
-    >
+    <div className="border border-stone-800 bg-stone-900/40 rounded p-4" style={{ borderLeftWidth: "3px", borderLeftColor: color }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0" onClick={() => setExpanded(!expanded)}>
-          <div className="flex items-center gap-2 mb-1">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-display text-lg">{entry.emotion}</span>
             <span className="font-mono text-xs text-stone-500">·</span>
             <span className="font-mono text-xs text-stone-400">{entry.intensity}/10</span>
             {entry.reviewed && (
-              <span className="font-mono text-[9px] tracking-wider text-emerald-500/80 uppercase ml-1">
-                ✓ reviewed
-              </span>
+              <span className="font-mono text-[9px] tracking-wider text-emerald-500/80 uppercase ml-1">✓ reviewed</span>
             )}
           </div>
           <div className="font-mono text-[10px] text-stone-500 flex items-center gap-2">
@@ -257,17 +248,33 @@ function EntryCard({ entry, onDelete, compact }) {
             {compact && <span>· {fmtDate(entry.timestamp)}</span>}
           </div>
           {entry.trigger && (
-            <p className="text-sm text-stone-300 mt-2 leading-snug">{entry.trigger}</p>
+            <p className="text-sm text-stone-300 mt-2 leading-snug line-clamp-2">{entry.trigger}</p>
+          )}
+          {entry.reviewed && !expanded && (
+            <div className="mt-1 font-mono text-[9px] text-stone-600 uppercase tracking-wider">tap to see review ↓</div>
           )}
         </div>
-        <button
-          onClick={onDelete}
-          className="text-stone-600 hover:text-rose-400 p-1 shrink-0"
-          aria-label="Delete"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+
+        {/* Edit + Delete */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={onEdit}
+            className="text-stone-600 hover:text-amber-400 p-1.5 rounded transition"
+            aria-label="Edit entry"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="text-stone-600 hover:text-rose-400 p-1.5 rounded transition"
+            aria-label="Delete entry"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
+
+      {/* Expanded review detail */}
       {expanded && entry.reviewed && (
         <div className="mt-3 pt-3 border-t border-stone-800 space-y-2 font-mono text-xs">
           <div>
@@ -288,51 +295,76 @@ function EntryCard({ entry, onDelete, compact }) {
   );
 }
 
-// ---------- ADD MODAL ----------
-function AddModal({ onClose, onSave }) {
-  const [step, setStep] = useState(1);
-  const [category, setCategory] = useState("negative");
-  const [emotion, setEmotion] = useState("");
-  const [intensity, setIntensity] = useState(5);
-  const [trigger, setTrigger] = useState("");
+// ============================================================================
+// ENTRY MODAL  — shared by Add and Edit
+// ============================================================================
+//
+//  mode "add"  → onSave(fullEntryObject)
+//  mode "edit" → onSave(patchObject)   — only changed fields
+//
+//  When editing a reviewed entry, a 4th step lets her update
+//  the classification and leverage plan too.
 
-  const canSave = emotion && trigger.trim().length > 0;
+function EntryModal({ mode, initial, onClose, onSave }) {
+  const isEdit   = mode === "edit";
+  const hasReview = isEdit && initial?.reviewed;
+
+  const [step, setStep]             = useState(1);
+  const [category, setCategory]     = useState(initial?.category       || "negative");
+  const [emotion, setEmotion]       = useState(initial?.emotion         || "");
+  const [intensity, setIntensity]   = useState(initial?.intensity       || 5);
+  const [trigger, setTrigger]       = useState(initial?.trigger         || "");
+  const [classification, setClass]  = useState(initial?.classification  || null);
+  const [leverage, setLeverage]     = useState(initial?.leverage        || "");
+
+  const totalSteps = hasReview ? 4 : 3;
+  const canSave    = emotion && trigger.trim().length > 0;
+
   const handleSave = () => {
-    onSave({
-      timestamp: new Date().toISOString(),
-      emotion, category, intensity,
-      trigger: trigger.trim(),
-      reviewed: false, classification: null, leverage: ""
-    });
+    if (isEdit) {
+      onSave({
+        category, emotion, intensity,
+        trigger: trigger.trim(),
+        ...(hasReview && { classification, leverage: leverage.trim() })
+      });
+    } else {
+      onSave({
+        timestamp: new Date().toISOString(),
+        category, emotion, intensity,
+        trigger:   trigger.trim(),
+        reviewed: false, classification: null, leverage: ""
+      });
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-stone-950/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+    <div className="fixed inset-0 z-50 bg-stone-950/95 backdrop-blur-sm flex items-end sm:items-center justify-center">
       <div className="w-full max-w-lg bg-stone-900 border-t sm:border border-stone-800 rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800 sticky top-0 bg-stone-900 z-10">
           <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
-            Log Emotion · {step}/3
+            {isEdit ? "Edit Entry" : "Log Emotion"} · {step}/{totalSteps}
           </div>
-          <button onClick={onClose} className="text-stone-500 hover:text-stone-200">
+          <button onClick={onClose} className="text-stone-500 hover:text-stone-200 p-1" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
+
         <div className="px-5 py-6 space-y-6">
+
+          {/* STEP 1 — Category + Emotion */}
           {step === 1 && (
             <>
               <div>
-                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
-                  Category
-                </label>
+                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">Category</label>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {["positive", "negative", "neutral"].map((c) => (
                     <button
                       key={c}
                       onClick={() => { setCategory(c); setEmotion(""); }}
                       className={`py-3 rounded border text-sm capitalize transition ${
-                        category === c
-                          ? "border-stone-400 bg-stone-800 text-stone-100"
-                          : "border-stone-800 text-stone-500 hover:border-stone-700"
+                        category === c ? "border-stone-400 bg-stone-800 text-stone-100" : "border-stone-800 text-stone-500 hover:border-stone-700"
                       }`}
                       style={category === c ? { borderLeftWidth: "3px", borderLeftColor: CATEGORY_COLORS[c] } : {}}
                     >
@@ -341,19 +373,16 @@ function AddModal({ onClose, onSave }) {
                   ))}
                 </div>
               </div>
+
               <div>
-                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
-                  Specific emotion
-                </label>
+                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">Specific emotion</label>
                 <div className="flex flex-wrap gap-2 mt-3">
                   {EMOTIONS[category].map((em) => (
                     <button
                       key={em}
                       onClick={() => setEmotion(em)}
                       className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                        emotion === em
-                          ? "bg-stone-100 text-stone-900 border-stone-100"
-                          : "border-stone-700 text-stone-300 hover:border-stone-500"
+                        emotion === em ? "bg-stone-100 text-stone-900 border-stone-100" : "border-stone-700 text-stone-300 hover:border-stone-500"
                       }`}
                     >
                       {em}
@@ -361,29 +390,21 @@ function AddModal({ onClose, onSave }) {
                   ))}
                 </div>
               </div>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!emotion}
-                className="w-full py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30 disabled:cursor-not-allowed"
-              >
+
+              <button onClick={() => setStep(2)} disabled={!emotion} className="w-full py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30 disabled:cursor-not-allowed">
                 Next
               </button>
             </>
           )}
+
+          {/* STEP 2 — Intensity */}
           {step === 2 && (
             <>
               <div>
-                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
-                  Intensity
-                </label>
+                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">Intensity</label>
                 <div className="flex items-center gap-4 mt-4">
                   <span className="font-mono text-xs text-stone-500">1</span>
-                  <input
-                    type="range" min="1" max="10"
-                    value={intensity}
-                    onChange={(e) => setIntensity(Number(e.target.value))}
-                    className="flex-1 accent-amber-500"
-                  />
+                  <input type="range" min="1" max="10" value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="flex-1 accent-amber-500" />
                   <span className="font-mono text-xs text-stone-500">10</span>
                 </div>
                 <div className="text-center mt-4">
@@ -396,49 +417,106 @@ function AddModal({ onClose, onSave }) {
               </div>
             </>
           )}
+
+          {/* STEP 3 — Trigger */}
           {step === 3 && (
             <>
               <div>
-                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">
-                  What triggered it?
-                </label>
+                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">What triggered it?</label>
+                {isEdit && (
+                  <div className="font-mono text-[10px] text-amber-600/70 mt-1 mb-2">
+                    Editing — correct freely. Original time is preserved.
+                  </div>
+                )}
                 <textarea
                   value={trigger}
                   onChange={(e) => setTrigger(e.target.value)}
                   placeholder="e.g. Conversation about finances"
-                  autoFocus rows={4}
-                  className="w-full mt-3 bg-stone-950 border border-stone-800 rounded p-3 text-stone-100 placeholder:text-stone-600 focus:border-stone-600 focus:outline-none resize-none"
+                  autoFocus rows={5}
+                  className="w-full mt-2 bg-stone-950 border border-stone-800 rounded p-3 text-stone-100 placeholder:text-stone-600 focus:border-stone-600 focus:outline-none resize-none"
                 />
-                <div className="font-mono text-[10px] text-stone-600 mt-2">
-                  Brief is fine — full reflection happens end of day.
-                </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setStep(2)} className="flex-1 py-3 border border-stone-700 text-stone-300 rounded">Back</button>
+                {hasReview ? (
+                  <button onClick={() => setStep(4)} disabled={!canSave} className="flex-1 py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30">
+                    Next
+                  </button>
+                ) : (
+                  <button onClick={handleSave} disabled={!canSave} className="flex-1 py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30 flex items-center justify-center gap-2">
+                    <Check className="w-4 h-4" /> {isEdit ? "Save changes" : "Save"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* STEP 4 — Edit review fields (only when editing a reviewed entry) */}
+          {step === 4 && hasReview && (
+            <>
+              <div>
+                <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-1">Classification</div>
+                <div className="font-display italic text-stone-400 text-sm mb-3">Update if your assessment has changed.</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setClass("reflection")}
+                    className={`p-4 rounded border text-left transition ${classification === "reflection" ? "border-emerald-600 bg-emerald-950/30" : "border-stone-800 hover:border-stone-700"}`}
+                  >
+                    <Brain className="w-4 h-4 text-emerald-400 mb-2" />
+                    <div className="font-display italic text-base">Reflection</div>
+                    <div className="font-mono text-[10px] text-stone-500 mt-1">considered, processed</div>
+                  </button>
+                  <button
+                    onClick={() => setClass("reaction")}
+                    className={`p-4 rounded border text-left transition ${classification === "reaction" ? "border-rose-600 bg-rose-950/30" : "border-stone-800 hover:border-stone-700"}`}
+                  >
+                    <Flame className="w-4 h-4 text-rose-400 mb-2" />
+                    <div className="font-display italic text-base">Reaction</div>
+                    <div className="font-mono text-[10px] text-stone-500 mt-1">impulsive, unfiltered</div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase">Leverage plan</label>
+                <textarea
+                  value={leverage}
+                  onChange={(e) => setLeverage(e.target.value)}
+                  placeholder="How do you use this better, or cause less damage?"
+                  autoFocus rows={5}
+                  className="w-full mt-3 bg-stone-950 border border-stone-800 rounded p-3 text-stone-100 placeholder:text-stone-600 focus:border-stone-600 focus:outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setStep(3)} className="flex-1 py-3 border border-stone-700 text-stone-300 rounded">Back</button>
                 <button
-                  onClick={handleSave} disabled={!canSave}
-                  className="flex-1 py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30"
+                  onClick={handleSave}
+                  disabled={!classification || leverage.trim().length === 0}
+                  className="flex-1 py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30 flex items-center justify-center gap-2"
                 >
-                  Save
+                  <Check className="w-4 h-4" /> Save changes
                 </button>
               </div>
             </>
           )}
+
         </div>
       </div>
     </div>
   );
 }
 
-// ---------- REVIEW VIEW ----------
+// ============================================================================
+// REVIEW VIEW  — end-of-day walkthrough
+// ============================================================================
+
 function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
   const entry = unreviewed[idx];
-  const [classification, setClassification] = useState(null);
-  const [leverage, setLeverage] = useState("");
+  const [classification, setClass] = useState(null);
+  const [leverage, setLeverage]    = useState("");
 
-  useEffect(() => {
-    setClassification(null); setLeverage("");
-  }, [idx, entry?.id]);
+  useEffect(() => { setClass(null); setLeverage(""); }, [idx, entry?.id]);
 
   if (!entry) {
     return (
@@ -453,9 +531,6 @@ function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
   }
 
   const cat = entry.category || categoryOf(entry.emotion);
-  const handleSubmit = () => {
-    onSubmit(entry.id, { reviewed: true, classification, leverage: leverage.trim() });
-  };
 
   return (
     <div className="space-y-6">
@@ -468,10 +543,7 @@ function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
         {idx + 1} of {unreviewed.length}
       </div>
 
-      <div
-        className="border border-stone-800 bg-stone-900/50 rounded p-5"
-        style={{ borderLeftWidth: "3px", borderLeftColor: CATEGORY_COLORS[cat] }}
-      >
+      <div className="border border-stone-800 bg-stone-900/50 rounded p-5" style={{ borderLeftWidth: "3px", borderLeftColor: CATEGORY_COLORS[cat] }}>
         <div className="font-mono text-[10px] text-stone-500 mb-2">{fmtTime(entry.timestamp)}</div>
         <div className="font-display text-3xl italic">{entry.emotion}</div>
         <div className="font-mono text-sm text-stone-400 mt-1">intensity {entry.intensity}/10</div>
@@ -485,22 +557,16 @@ function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
         <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Your response</div>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => setClassification("reflection")}
-            className={`p-4 rounded border text-left transition ${
-              classification === "reflection"
-                ? "border-emerald-600 bg-emerald-950/30" : "border-stone-800"
-            }`}
+            onClick={() => setClass("reflection")}
+            className={`p-4 rounded border text-left transition ${classification === "reflection" ? "border-emerald-600 bg-emerald-950/30" : "border-stone-800 hover:border-stone-700"}`}
           >
             <Brain className="w-4 h-4 text-emerald-400 mb-2" />
             <div className="font-display italic text-base">Reflection</div>
             <div className="font-mono text-[10px] text-stone-500 mt-1">considered, processed</div>
           </button>
           <button
-            onClick={() => setClassification("reaction")}
-            className={`p-4 rounded border text-left transition ${
-              classification === "reaction"
-                ? "border-rose-600 bg-rose-950/30" : "border-stone-800"
-            }`}
+            onClick={() => setClass("reaction")}
+            className={`p-4 rounded border text-left transition ${classification === "reaction" ? "border-rose-600 bg-rose-950/30" : "border-stone-800 hover:border-stone-700"}`}
           >
             <Flame className="w-4 h-4 text-rose-400 mb-2" />
             <div className="font-display italic text-base">Reaction</div>
@@ -511,9 +577,7 @@ function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
 
       <div>
         <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Leverage plan</div>
-        <div className="font-display italic text-stone-400 text-sm mb-3">
-          How do you use this better, or cause less damage?
-        </div>
+        <div className="font-display italic text-stone-400 text-sm mb-3">How do you use this better, or cause less damage?</div>
         <textarea
           value={leverage}
           onChange={(e) => setLeverage(e.target.value)}
@@ -526,24 +590,26 @@ function ReviewView({ unreviewed, idx, setIdx, onSubmit, onExit }) {
       <div className="flex gap-2">
         <button onClick={onExit} className="px-4 py-3 border border-stone-700 text-stone-300 rounded">Exit</button>
         <button
-          onClick={handleSubmit}
+          onClick={() => onSubmit(entry.id, { reviewed: true, classification, leverage: leverage.trim() })}
           disabled={!classification || leverage.trim().length === 0}
           className="flex-1 py-3 bg-amber-600 text-stone-950 font-medium rounded disabled:opacity-30 flex items-center justify-center gap-2"
         >
-          {idx + 1 < unreviewed.length
-            ? <>Next <ChevronRight className="w-4 h-4" /></>
-            : <>Finish <Check className="w-4 h-4" /></>}
+          {idx + 1 < unreviewed.length ? <>Next <ChevronRight className="w-4 h-4" /></> : <>Finish <Check className="w-4 h-4" /></>}
         </button>
       </div>
     </div>
   );
 }
 
-// ---------- PATTERNS VIEW ----------
+// ============================================================================
+// PATTERNS VIEW
+// ============================================================================
+
 function PatternsView({ entries }) {
   const stats = useMemo(() => {
     if (entries.length === 0) return null;
-    const byEmotion = {}, byCategory = { positive: 0, negative: 0, neutral: 0 };
+    const byEmotion  = {};
+    const byCategory = { positive: 0, negative: 0, neutral: 0 };
     let reflections = 0, reactions = 0, intensitySum = 0;
     entries.forEach((e) => {
       byEmotion[e.emotion] = (byEmotion[e.emotion] || 0) + 1;
@@ -558,8 +624,8 @@ function PatternsView({ entries }) {
       total: entries.length,
       avgIntensity: (intensitySum / entries.length).toFixed(1),
       reflections, reactions,
-      topEmotions: Object.entries(byEmotion).sort(([, a], [, b]) => b - a).slice(0, 6).map(([name, count]) => ({ name, count })),
-      pieData: Object.entries(byCategory).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }))
+      topEmotions: Object.entries(byEmotion).sort(([,a],[,b])=>b-a).slice(0,6).map(([name,count])=>({name,count})),
+      pieData: Object.entries(byCategory).filter(([,v])=>v>0).map(([name,value])=>({name,value}))
     };
   }, [entries]);
 
@@ -573,18 +639,18 @@ function PatternsView({ entries }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="Total logs" value={stats.total} />
+        <StatCard label="Total logs"    value={stats.total} />
         <StatCard label="Avg intensity" value={stats.avgIntensity} />
-        <StatCard label="Reflections" value={stats.reflections} color="#7a9b76" />
-        <StatCard label="Reactions" value={stats.reactions} color="#b85c5c" />
+        <StatCard label="Reflections"   value={stats.reflections} color="#7a9b76" />
+        <StatCard label="Reactions"     value={stats.reactions}   color="#b85c5c" />
       </div>
 
       {(stats.reflections + stats.reactions) > 0 && (
         <div className="border border-stone-800 rounded p-4">
           <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Response ratio</div>
           <div className="flex h-2 rounded overflow-hidden">
-            <div className="bg-emerald-600" style={{ width: `${(stats.reflections / (stats.reflections + stats.reactions)) * 100}%` }} />
-            <div className="bg-rose-600" style={{ width: `${(stats.reactions / (stats.reflections + stats.reactions)) * 100}%` }} />
+            <div className="bg-emerald-600" style={{ width: `${(stats.reflections/(stats.reflections+stats.reactions))*100}%` }} />
+            <div className="bg-rose-600"    style={{ width: `${(stats.reactions/(stats.reflections+stats.reactions))*100}%` }} />
           </div>
           <div className="flex justify-between mt-2 font-mono text-[10px] text-stone-500">
             <span>{stats.reflections} reflection</span>
@@ -598,7 +664,7 @@ function PatternsView({ entries }) {
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={stats.topEmotions} layout="vertical" margin={{ left: 0, right: 10 }}>
             <XAxis type="number" hide />
-            <YAxis dataKey="name" type="category" tick={{ fill: "#a8a29e", fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+            <YAxis dataKey="name" type="category" tick={{ fill: "#a8a29e", fontSize: 11 }} axisLine={false} tickLine={false} width={85} />
             <Bar dataKey="count" fill="#c9a961" radius={[0, 2, 2, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -614,6 +680,15 @@ function PatternsView({ entries }) {
             <Tooltip contentStyle={{ background: "#0c0a09", border: "1px solid #292524", fontSize: 11 }} />
           </PieChart>
         </ResponsiveContainer>
+        <div className="flex justify-center gap-4 mt-2">
+          {stats.pieData.map((d) => (
+            <div key={d.name} className="flex items-center gap-1.5 font-mono text-[10px]">
+              <div className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[d.name] }} />
+              <span className="text-stone-400 capitalize">{d.name}</span>
+              <span className="text-stone-500">{d.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -628,10 +703,13 @@ function StatCard({ label, value, color }) {
   );
 }
 
-// ---------- SETTINGS VIEW ----------
+// ============================================================================
+// SETTINGS VIEW
+// ============================================================================
+
 function SettingsView({ data, onImport, onClear }) {
   const fileRef = useRef();
-  const [message, setMessage] = useState(null);
+  const [message, setMessage]           = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   const handleExport = () => {
@@ -661,81 +739,44 @@ function SettingsView({ data, onImport, onClear }) {
 
   return (
     <div className="space-y-6">
-      {/* App info */}
       <div className="border border-stone-800 rounded p-4 space-y-2 font-mono text-xs">
-        <div className="flex justify-between">
-          <span className="text-stone-500">App version</span>
-          <span>1.0</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-stone-500">Data schema</span>
-          <span>v{SCHEMA_VERSION}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-stone-500">Entries</span>
-          <span>{data.entries.length}</span>
-        </div>
+        <div className="flex justify-between"><span className="text-stone-500">App version</span><span>1.1.0</span></div>
+        <div className="flex justify-between"><span className="text-stone-500">Data schema</span><span>v{SCHEMA_VERSION}</span></div>
+        <div className="flex justify-between"><span className="text-stone-500">Entries</span><span>{data.entries.length}</span></div>
         <div className="flex justify-between">
           <span className="text-stone-500">First entry</span>
-          <span>
-            {data.entries.length > 0
-              ? fmtDate(data.entries[data.entries.length - 1].timestamp)
-              : "—"}
-          </span>
+          <span>{data.entries.length > 0 ? fmtDate(data.entries[data.entries.length - 1].timestamp) : "—"}</span>
         </div>
       </div>
 
       {message && (
-        <div className={`rounded p-3 text-sm ${
-          message.type === "ok"
-            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-800"
-            : "bg-rose-900/30 text-rose-200 border border-rose-800"
-        }`}>
+        <div className={`rounded p-3 text-sm ${message.type === "ok" ? "bg-emerald-900/30 text-emerald-200 border border-emerald-800" : "bg-rose-900/30 text-rose-200 border border-rose-800"}`}>
           {message.text}
         </div>
       )}
 
-      {/* Backup */}
       <div>
         <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Backup</div>
-        <button
-          onClick={handleExport}
-          className="w-full py-3 border border-stone-700 rounded flex items-center justify-center gap-2 hover:bg-stone-900 transition"
-        >
-          <Download className="w-4 h-4" />
-          <span>Export to JSON file</span>
+        <button onClick={handleExport} className="w-full py-3 border border-stone-700 rounded flex items-center justify-center gap-2 hover:bg-stone-900 transition">
+          <Download className="w-4 h-4" /><span>Export to JSON file</span>
         </button>
-        <p className="font-mono text-[10px] text-stone-500 mt-2 leading-relaxed">
-          Save regularly. Data lives on this device only. If you clear browser data or switch phones, it's gone.
-        </p>
+        <p className="font-mono text-[10px] text-stone-500 mt-2 leading-relaxed">Data lives on this device only. Export weekly to Google Drive.</p>
       </div>
 
-      {/* Restore */}
       <div>
         <div className="font-mono text-[10px] tracking-[0.2em] text-stone-500 uppercase mb-3">Restore</div>
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="w-full py-3 border border-stone-700 rounded flex items-center justify-center gap-2 hover:bg-stone-900 transition"
-        >
-          <Upload className="w-4 h-4" />
-          <span>Import from JSON file</span>
+        <button onClick={() => fileRef.current?.click()} className="w-full py-3 border border-stone-700 rounded flex items-center justify-center gap-2 hover:bg-stone-900 transition">
+          <Upload className="w-4 h-4" /><span>Import from JSON file</span>
         </button>
         <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-        <p className="font-mono text-[10px] text-stone-500 mt-2">
-          Replaces all current data. Export first if unsure.
-        </p>
+        <p className="font-mono text-[10px] text-stone-500 mt-2">Replaces all current data. Export first if unsure.</p>
       </div>
 
-      {/* Danger */}
       <div>
         <div className="font-mono text-[10px] tracking-[0.2em] text-rose-500/80 uppercase mb-3">Danger</div>
         {!confirmClear ? (
-          <button
-            onClick={() => setConfirmClear(true)}
-            className="w-full py-3 border border-rose-900/60 text-rose-300 rounded flex items-center justify-center gap-2"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>Clear all data</span>
+          <button onClick={() => setConfirmClear(true)} className="w-full py-3 border border-rose-900/60 text-rose-300 rounded flex items-center justify-center gap-2">
+            <AlertTriangle className="w-4 h-4" /><span>Clear all data</span>
           </button>
         ) : (
           <div className="border border-rose-900/60 bg-rose-950/20 rounded p-4 space-y-3">
@@ -751,14 +792,17 @@ function SettingsView({ data, onImport, onClear }) {
   );
 }
 
-// ---------- BOTTOM NAV ----------
+// ============================================================================
+// BOTTOM NAV
+// ============================================================================
+
 function BottomNav({ view, setView, onAdd }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-stone-800 bg-stone-950/95 backdrop-blur">
-      <div className="max-w-lg mx-auto grid grid-cols-4 relative">
-        <NavBtn active={view === "log"} onClick={() => setView("log")} icon={<BookOpen className="w-4 h-4" />} label="Log" />
+      <div className="max-w-lg mx-auto flex items-center">
+        <NavBtn active={view === "log"}      onClick={() => setView("log")}      icon={<BookOpen className="w-4 h-4" />}  label="Log" />
         <NavBtn active={view === "patterns"} onClick={() => setView("patterns")} icon={<BarChart3 className="w-4 h-4" />} label="Patterns" />
-        <div className="flex items-center justify-center">
+        <div className="flex-1 flex justify-center relative">
           <button
             onClick={onAdd}
             className="absolute -top-5 w-12 h-12 rounded-full bg-amber-500 text-stone-950 flex items-center justify-center shadow-lg hover:bg-amber-400 transition"
@@ -768,6 +812,7 @@ function BottomNav({ view, setView, onAdd }) {
           </button>
         </div>
         <NavBtn active={view === "settings"} onClick={() => setView("settings")} icon={<Settings className="w-4 h-4" />} label="Settings" />
+        <div className="flex-1" /> {/* balance spacer */}
       </div>
     </nav>
   );
@@ -777,9 +822,7 @@ function NavBtn({ active, onClick, icon, label }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center py-3 gap-1 transition ${
-        active ? "text-amber-500" : "text-stone-500"
-      }`}
+      className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 transition ${active ? "text-amber-500" : "text-stone-500 hover:text-stone-300"}`}
     >
       {icon}
       <span className="font-mono text-[9px] tracking-[0.15em] uppercase">{label}</span>
