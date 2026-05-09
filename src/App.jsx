@@ -248,7 +248,7 @@ function EntryCard({ entry, onDelete, onEdit, compact }) {
             {compact && <span>· {fmtDate(entry.timestamp)}</span>}
           </div>
           {entry.trigger && (
-            <p className="text-sm text-stone-300 mt-2 leading-snug line-clamp-2">{entry.trigger}</p>
+            <p className="text-sm text-stone-300 mt-2 leading-snug">{entry.trigger}</p>
           )}
           {entry.reviewed && !expanded && (
             <div className="mt-1 font-mono text-[9px] text-stone-600 uppercase tracking-wider">tap to see review ↓</div>
