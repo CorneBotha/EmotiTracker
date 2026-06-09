@@ -328,7 +328,7 @@ function EntryModal({ mode, initial, onClose, onSave }) {
         <>
           <FieldLabel>What triggered it?</FieldLabel>
           {isEdit && <div className="font-mono text-[10px] text-amber-600/70 mt-1 mb-1">Original time is preserved.</div>}
-          <textarea value={trigger} onChange={e => setTrigger(e.target.value)} placeholder="e.g. Conversation about finances"
+          <textarea value={trigger} onChange={e => setTrigger(e.target.value)} placeholder="e.g. Corne being himself and caring for me"
             autoFocus rows={5} className={TEXTAREA_CLS} />
           <div className="flex gap-2 mt-4">
             <SecondaryBtn onClick={() => setStep(2)}>Back</SecondaryBtn>
